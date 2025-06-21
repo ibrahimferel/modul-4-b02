@@ -210,15 +210,20 @@ void DETECT_LAWAK(char *buf, int size) {
         char abclower[256];  
         strtolower(abclower, token); 
         
-        for (int i = 0; i < countsensitif; i++) {
-            if (strcmp(abclower, lawakwords[i]) == 0) {
-                strcat(lawakspace, "lawak");
-                // cek = 1;
-                break;
-            }
+        int cek = 0;
+    for (int i = 0; i < countsensitif; i++) {
+        if (strcmp(abclower, lawakwords[i]) == 0) {
+            strcat(lawakspace, "lawak");
+            cek = 1;
+            break;
         }
-        strcat(lawakspace, " ");
-        token = strtok_r(NULL, " \n\r\t", &saveptr);
+    }
+    if (!cek) {
+        strcat(lawakspace, token);
+    }
+    strcat(lawakspace, " ");
+    token = strtok_r(NULL, " \n\r\t", &saveptr);
+
     }
     
     // int len = strlen(lawakspace);
@@ -433,8 +438,12 @@ Pendahuluan Problem A : Karena kita perlu menyembunyikan ektensi dari setiap fil
 
 *Beberapa bukti SS dan/atau hasil Output dari kasus A :*
 ##### Isi direktori SOURCE
-
-
+![image](https://github.com/user-attachments/assets/550efbf2-0f98-4a56-a324-6d47a117bfd8)
+##### Nama nama file dalam MOUNT
+![image](https://github.com/user-attachments/assets/51376bbd-7e6f-4b17-8ff1-f4228f1240ba)
+##### Kalau misal cat tes, maka akan diakses tes.txt di dirpath (SOURCE)
+![image](https://github.com/user-attachments/assets/9f584f21-c891-4f5f-bb34-eb3fe00f425a)
+![image](https://github.com/user-attachments/assets/124ef2d6-0495-4149-9568-3481d21ae2ea)
 
 #### *B. Akses terbatas untuk file dengan nama secret*
 Pendahuluan Problem B : Pertama, kita perlu menentukan algoritma untuk mendeteksi apakah sebuah file bernama secret (atau sesuai nama yang ditentukan di konfigurasi) terdapat dalam path yang diakses. Untuk itu, saya menggunakan solusi berupa pembuatan sub-fungsi secretFile, yang bertugas mengecek apakah nama file sesuai dengan nama dasar yang dikonfigurasi. Selanjutnya, karena akses ke file tersebut harus dibatasi pada jam-jam tertentu, saya juga membuat sub-fungsi jamSecret yang akan menentukan apakah waktu saat ini berada dalam rentang waktu yang diizinkan untuk mengakses file tersebut.
@@ -449,6 +458,10 @@ Pendahuluan Problem B : Pertama, kita perlu menentukan algoritma untuk mendeteks
 - track hour, dan set dibatasi dari jam 08.00 hingga 18.00
 
 Lalu yang perlu kita lakukan yakni meng-Update getattr, readdir, open, access, dan read.
+
+*Beberapa bukti SS dan/atau hasil Output dari kasus B :*
+##### File bernama secret hilang pada jam 21.07.22
+![image](https://github.com/user-attachments/assets/b924ccb3-be57-4fd3-b9f0-866ef1ed4811)
 
 ##### *C. Filter konten*
 Pendahuluan Problem C : Kita perlu memfilter 2 tipe konten. Ada konten file tipe .txt yang nantinya akan difilter kata-katanya berdasarkan daftar kata terlarang dari konfigurasi. Setiap kata yang cocok akan diganti menjadi kata 'lawak'. Proses ini dilakukan dengan membaca seluruh isi file, memecahnya menjadi token, lalu mencocokkannya dengan daftar filter. Sementara itu, untuk konten file tipe gambar (atau biner pada umumnya), isi file tidak ditampilkan dalam bentuk mentah. Sebagai gantinya, file dikonversi ke dalam format Base64 agar tetap dapat ditampilkan secara aman dan tidak merusak tampilan terminal. Konversi ini dilakukan menggunakan fungsi base64_encode() yang mengubah blok data biner menjadi representasi teks ASCII. dan karena dalam kedua proses ini kita "membaca" berarti nantinya kita akan banyak mengubah sub fungsi read
@@ -474,6 +487,16 @@ Pendahuluan Problem C : Kita perlu memfilter 2 tipe konten. Ada konten file tipe
 - Jika jumlah input tidak kelipatan 3, maka karakter padding '=' akan ditambahkan di akhir untuk menjaga panjang output tetap kelipatan 4
 - Hasil akhir dari konversi ini disalin ke variabel output (out), lalu dikembalikan panjangnya
 
+*Beberapa bukti SS dan/atau hasil Output dari kasus C :*
+##### Isi lawak.conf yang dibuat pada poin E
+![image](https://github.com/user-attachments/assets/1530923c-5da3-4179-817e-58da48dfa4aa)
+##### Isi dari teslawak.txt pada direktori SOURCE
+![image](https://github.com/user-attachments/assets/ebd9e14e-e847-4c0d-bef1-c4a635d27aac)
+##### cat teslawak di MOUNT
+![image](https://github.com/user-attachments/assets/393ad449-6db9-4997-abdc-cd777c6d0f98)
+##### cat pemandangan di MOUNT (pembuktian Base64)
+![image](https://github.com/user-attachments/assets/825e2388-d93a-4806-8d4f-4ace97856236)
+
 ##### *D. Logging Akses*
 Pendahuluan Problem D : Kita perlu mencatat log di logfile pada saat aksi READ dan ACCESS. Pada laporan log juga harus disediakan kapan READ/ACCESS itu dilakukan.
 format LOG = [YYYY-MM-DD HH:MM:SS] [UID] [ACTION] [PATH]
@@ -488,6 +511,10 @@ format LOG = [YYYY-MM-DD HH:MM:SS] [UID] [ACTION] [PATH]
 
 Update READ dan ACCESS untuk mengeluarkan output log dan arahkan ke write_log 
 
+*Beberapa bukti SS dan/atau hasil Output dari kasus D :*
+##### Contoh dari log
+![image](https://github.com/user-attachments/assets/61402d6e-9cc4-4726-b697-688fcfbb9ced)
+
 ##### *E. Bikin configurasi*
 Pendahuluan Problem E : Kita perlu menuliskan apa apa saja kata yang sensitif atau terdetect "lawak", lalu nama file apa yang ingin diistimewakan dalam artian hanya bisa diakses pada jam jam tertentu, dan aksesnya dari jam berapa ke jam berapa. Configurasi ini membuat kita menjadi lebih fleksibel, dimana kita bisa mengubah informasi sesuka hati (misal : Saya ingin mengubah jam awal akses pada nama file pemandangan)
 
@@ -499,7 +526,6 @@ Pendahuluan Problem E : Kita perlu menuliskan apa apa saja kata yang sensitif at
 - Bila yang ditemukan dalam lawak.conf adalah "ACCESS_END=", maka start dari temp + 11 karakter untuk menyimpan kedalam variabel "end_hour"
 - Bila yang ditemukan dalam lawak.conf adalah "FILTER_WORDS=", maka start dari temp + 13 karakter untuk menyimpan kedalam variabel "words"
 - Nantinya words akan dipecah-pecah kata perkatanya dan disimpan dalam variabel lawakwords yang nantinya akan dipakai pada subfungsi-subfungsi lain apakah terdapat kata dalam suatu file yang mengandung kata "lawak"
-- 
 
 #### Kendala
 
