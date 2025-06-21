@@ -406,14 +406,14 @@ int main(int argc, char *argv[]){
 }
 
 ```
-#### Penjelasan lawak.c
-##### Penjelasan ke-0
+### Penjelasan lawak.c
+#### Penjelasan ke-0
 1. Tambahkan open dan access dari template yang diberikan di modul. [Klik disini untuk melihat modul](https://github.com/arsitektur-jaringan-komputer/Modul-Sisop/blob/master/Modul4/README-ID.md)
 2. Fungsi Main, menerima beberapa argumen dan masuk ke sub-fungsi load_config untuk menyalin isi dari lawak.conf kedalam beberapa nama file yang sudah saya buat. Yakni katasensitif, countsensitif, start_hour, end_hour.
 3. Kita bikin char *dirpath yang berisikan path menuju ke direktori source yang kita bikin.
 4. Masuk ke fungsi fuse, ada getattr, opendir, readdir, read, open, dan juga access.
 
-##### *A. Menyembunyikan ekstensi dari setiap file.*
+#### *A. Menyembunyikan ekstensi dari setiap file.*
 Pendahuluan Problem A : Karena kita perlu menyembunyikan ektensi dari setiap file ketika kita melakukan command "ls", maka hal yang perlu diperhatikan dan dimodifikasi adalah utamanya terkait readdir. Namun ketika kita ingin melakukan perintah seperti "cat", kita hanya boleh menuliskan nama filenya tanpa ekstensinya juga (contoh : "cat temulawak", maka nanti akan dimunculkan hasil tulisan dari temulawak.txt). Hal ini memicu saya untuk membuat suatu sub-fungsi baru yakni misteriusNama, yang berfungsi sebagai petunjuk ke path asli dari suatu file.
 
 *Penjelasan misteriusNama :*
@@ -431,7 +431,12 @@ Pendahuluan Problem A : Karena kita perlu menyembunyikan ektensi dari setiap fil
 - Lalu kita buat variabel "nama", yang mana menampung nama file dari source tanpa ekstensi.
 - Gunakan filler untuk menampilkan nama file tanpa ekstensi pada saat user menulis command "ls"
 
-##### *B. Akses terbatas untuk file dengan nama secret*
+*Beberapa bukti SS dan/atau hasil Output dari kasus A :*
+##### Isi direktori SOURCE
+
+
+
+#### *B. Akses terbatas untuk file dengan nama secret*
 Pendahuluan Problem B : Pertama, kita perlu menentukan algoritma untuk mendeteksi apakah sebuah file bernama secret (atau sesuai nama yang ditentukan di konfigurasi) terdapat dalam path yang diakses. Untuk itu, saya menggunakan solusi berupa pembuatan sub-fungsi secretFile, yang bertugas mengecek apakah nama file sesuai dengan nama dasar yang dikonfigurasi. Selanjutnya, karena akses ke file tersebut harus dibatasi pada jam-jam tertentu, saya juga membuat sub-fungsi jamSecret yang akan menentukan apakah waktu saat ini berada dalam rentang waktu yang diizinkan untuk mengakses file tersebut.
 
 *Penjelasan secretFile :*
@@ -495,7 +500,7 @@ Pendahuluan Problem E : Kita perlu menuliskan apa apa saja kata yang sensitif at
 - Bila yang ditemukan dalam lawak.conf adalah "FILTER_WORDS=", maka start dari temp + 13 karakter untuk menyimpan kedalam variabel "words"
 - Nantinya words akan dipecah-pecah kata perkatanya dan disimpan dalam variabel lawakwords yang nantinya akan dipakai pada subfungsi-subfungsi lain apakah terdapat kata dalam suatu file yang mengandung kata "lawak"
 - 
-#### Beberapa bukti SS dan/atau hasil Output
+
 #### Kendala
 
 #### lawak.conf
