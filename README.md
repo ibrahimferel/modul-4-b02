@@ -449,7 +449,7 @@ Pendahuluan Problem C : Kita perlu memfilter 2 tipe konten. Ada konten file tipe
 *Penjelasan read :*
 - Pertama detect dulu ekstensi file yang sedang dibaca itu apa, kalau ternyata file.txt, maka process akan masuk kedalam sub fungsi DETECT_LAWAK untuk mengganti kata kata yang dianggap lawak menjadi kata "lawak"
 - Panjang hasil dari DETECT_LAWAK nantinya diukur kembali panjang nya berapa menggunakan strlen
-- Namun apabila file tersebut adalah file biner, kita akan buat 2 variabel yang bernama masing-masing "B64" dan "tmpB64". Variabel B64 digunakan untuk ngambil hasil output aslinya ketika kita melakukan "cat" pada file biner, dan tmpB64 akan menampung hasil dari process dimodifikasi nya hasil output asli tersebut menjadi output dalam bentuk Base64
+- Namun apabila file tersebut adalah file biner, kita akan buat 2 variabel yang bernama masing-masing "B64" dan "tmpB64". Variabel B64 digunakan untuk membaca isi asli file biner, mirip seperti perilaku cat, namun hasilnya tidak langsung ditampilkan mentah melainkan akan dikonversi ke format Base64 sesuai arahan soal
 - Hasil disalin ke buf dan ditampilkan.
 
 *Penjelasan DETECT_LAWAK :*
@@ -461,7 +461,30 @@ Pendahuluan Problem C : Kita perlu memfilter 2 tipe konten. Ada konten file tipe
 - Bebaskan memory copy dan lawakspace
 
 *Penjelasan base64_encode :*
--
+- Fungsi ini mengubah data biner menjadi bentuk teks ASCII agar bisa ditampilkan aman di terminal atau disimpan sebagai teks
+- Input berupa blok byte (in) akan dipecah setiap 3 byte, lalu digabung menjadi 24 bit (triple)
+- triple tersebut akan dibagi menjadi empat bagian masing-masing 6 bit, dan setiap bagian diubah menjadi karakter menggunakan base64_table
+- Jika jumlah input tidak kelipatan 3, maka karakter padding '=' akan ditambahkan di akhir untuk menjaga panjang output tetap kelipatan 4
+- Hasil akhir dari konversi ini disalin ke variabel output (out), lalu dikembalikan panjangnya
+
+##### *D. Logging Akses*
+Pendahuluan Problem D : Kita perlu mencatat log di logfile pada saat aksi READ dan ACCESS. Pada laporan log juga harus disediakan kapan READ/ACCESS itu dilakukan.
+format LOG = [YYYY-MM-DD HH:MM:SS] [UID] [ACTION] [PATH]
+
+*Penjelasan write_log :*
+- Buka "/var/log/lawakfs.log" jika sudah ada, kalau belum buat
+- Tampung isi log dalam log_file
+- Dapatkan waktu lokal terkini
+- Dan dapatkan user id
+- Buat tmptime untuk menampung waktu yang dilakukan user untuk melakukan READ/ACCESS
+- Lalu taruh semua informasi nya mulai dari tmptime, uid, action, dan juga pathnya ke kedalam log_file
+
+Update READ dan ACCESS untuk mengeluarkan output log dan arahkan ke write_log 
+
+##### *E. Bikin configurasi*
+Pendahuluan Problem E : Kita perlu menuliskan apa apa saja kata yang sensitif atau terdetect "lawak", lalu nama file apa yang ingin diistimewakan dalam artian hanya bisa diakses pada jam jam tertentu, dan aksesnya dari jam berapa ke jam berapa. Configurasi ini membuat kita menjadi lebih fleksibel, dimana kita bisa mengubah informasi sesuka hati (misal : Saya ingin mengubah jam awal akses pada nama file pemandangan)
+
+*Penjelasan load_config :*
 
 
 #### Beberapa bukti SS dan/atau hasil Output
