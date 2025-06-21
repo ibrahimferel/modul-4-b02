@@ -22,10 +22,197 @@
 ### Laporan Resmi Praktikum Modul 4 _(Module 4 Lab Work Report)_
 
 ### [Task 1 - FUSecure]
+#### Penjelasan soal
+Pada soal ini disuruh untuk membuat filesystem kustom menggunakan FUSE yang :  
+- Meniru perilaku sistem file asli
+- Tetap berbagi file publik untuk kepentingan bersama
+- Tapi membatasi akses file privat agar hanya bisa dibaca oleh pemiliknya
+- Dan menolak semua upaya penghapusan, pengeditan, atau penambahan file(read-only)
+##### 
+##### a.Setup direktori dan Pembuatan User 
+-  Membuat direktori utama /home/shared_files dan 3 subdirektorinya dengan perintah berikut :
+```
+sudo mkdir -p /home/shared_files/public
+sudo mkdir -p /home/shared_files/private_yuadi
+sudo mkdir -p /home/shared_files/private_irwandi
+```
+- Buat 2 Linux users: yuadi dan irwandi. Dengan perintah berikut :
+```
+Buat user yuadi
+sudo useradd -m yuadi
+sudo passwd yuadi #Masukkan password sesuai keinginan
 
-### [Task 2 - LawakFS++] (Hard)
-Author : Ibrahim Ferel - 5025241049
+Buat user irwandi
+sudo useradd -m irwandi
+sudo passwd irwandi #Masukkan password sesuai keinginan
+```
+- Atur hak akses folder private agar hanya yuadi bisa mengakses private_yuadi, dan irwandi hanya bisa mengakses private_irwandi, gunakan perintah berikut :
+```
+Set owner dan permission untuk folder yuadi
+sudo chown yuadi:yuadi /home/shared_files/private_yuadi
+sudo chmod 700 /home/shared_files/private_yuadi
 
+Set owner dan permission untuk folder irwandi
+sudo chown irwandi:irwandi /home/shared_files/private_irwandi
+sudo chmod 700 /home/shared_files/private_irwandi
+```
+chmod 700 artinya hanya owner yang  bisa read/write/execute folder, lainnya tidak bisa meilhat isinya sama sekali 
+- Set akses folder public agar semua user bisa mengakses folder public dengan perintah berikut :
+```
+sudo chmod 755 /home/shared_files/public
+```
+chmod 755 artinya owner bisa read/write/execute, grup dan others hanya bisa read/execute 
+
+##### b. Akses mount point 
+- Isi file FUSecure.c dengan kode yang menampilkan isi dirketori(getattr, readdir) dan hanya bisa baca file(read) seperti berikut :
+```
+#define FUSE_USE_VERSION 28
+#include <fuse.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <errno.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <pwd.h>
+
+static const char *dirpath = "/home/shared_files";
+
+
+int is_public_path(const char *path) {
+    return (strncmp(path, "/public/", 8) == 0 || strcmp(path, "/public") == 0);
+}
+
+int is_authorized(const char *path) {
+    uid_t uid = getuid();
+    struct passwd *pw = getpwuid(uid);
+    if (!pw) return 0;
+    const char *username = pw->pw_name;
+
+   
+    if (strncmp(path, "/private_yuadi", 14) == 0 && strcmp(username, "yuadi") != 0)
+        return 0;
+
+    
+    if (strncmp(path, "/private_irwandi", 16) == 0 && strcmp(username, "irwandi") != 0)
+        return 0;
+
+    return 1; 
+}
+
+static int xmp_getattr(const char *path, struct stat *stbuf)
+{
+    int res;
+    char fpath[1000];
+    sprintf(fpath, "%s%s", dirpath, path);
+    res = lstat(fpath, stbuf);
+    if (res == -1) return -errno;
+    return 0;
+}
+
+static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
+{
+    if (!is_public_path(path) && !is_authorized(path)) return -EACCES;
+
+    char fpath[1000];
+    if (strcmp(path, "/") == 0) {
+        path = dirpath;
+        sprintf(fpath, "%s", path);
+    } else sprintf(fpath, "%s%s", dirpath, path);
+
+    int res = 0;
+    DIR *dp;
+    struct dirent *de;
+    (void) offset;
+    (void) fi;
+
+    dp = opendir(fpath);
+    if (dp == NULL) return -errno;
+
+    while ((de = readdir(dp)) != NULL) {
+        struct stat st;
+        memset(&st, 0, sizeof(st));
+        st.st_ino = de->d_ino;
+        st.st_mode = de->d_type << 12;
+        res = (filler(buf, de->d_name, &st, 0));
+        if (res != 0) break;
+    }
+
+    closedir(dp);
+    return 0;
+}
+
+static int xmp_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+{
+    if (!is_public_path(path) && !is_authorized(path)) return -EACCES;
+
+    char fpath[1000];
+    sprintf(fpath, "%s%s", dirpath, path);
+    int fd = open(fpath, O_RDONLY);
+    if (fd == -1) return -errno;
+
+    int res = pread(fd, buf, size, offset);
+    if (res == -1) res = -errno;
+
+    close(fd);
+    return res;
+}
+
+
+static int xmp_mkdir(const char *path, mode_t mode) { return -EROFS; }
+static int xmp_rmdir(const char *path) { return -EROFS; }
+static int xmp_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) { return -EROFS; }
+static int xmp_create(const char* path, mode_t mode, struct fuse_file_info* fi) { return -EROFS; }
+static int xmp_unlink(const char *path) { return -EROFS; }
+static int xmp_rename(const char *from, const char *to) { return -EROFS; }
+static int xmp_truncate(const char *path, off_t size) { return -EROFS; }
+static int xmp_chmod(const char *path, mode_t mode) { return -EROFS; }
+
+static struct fuse_operations xmp_oper = {
+    .getattr = xmp_getattr,
+    .readdir = xmp_readdir,
+    .read = xmp_read,
+    .mkdir = xmp_mkdir,
+    .rmdir = xmp_rmdir,
+    .write = xmp_write,
+    .create = xmp_create,
+    .unlink = xmp_unlink,
+    .rename = xmp_rename,
+    .truncate = xmp_truncate,
+    .chmod = xmp_chmod,
+};
+
+int main(int argc, char *argv[])
+{
+    umask(0);
+    return fuse_main(argc, argv, &xmp_oper, NULL);
+}
+
+```
+1. Header & Konstanta
+- #define FUSE_USE_VERSION 28: Menentukan versi API FUSE.
+- #include ...: Mengimpor library yang dibutuhkan untuk operasi filesystem.
+- static const char *dirpath = "/home/shared_files";: Path sumber file asli yang akan dimount.
+2. Fungsi xmp_getattr
+- Membuat path lengkap dari path virtual
+- Memanggi lstat() untuk mengambil metadata file
+- Digunakan oleh command ls, stat, dll
+3. 
+
+- Buat folder tempat untuk mount filesystem :
+```
+sudo mkdir -p /mnt/secure_fs
+```
+- Jalankan program FUSE kamu dengan syntax seperti ini :
+```
+sudo ./fusecure /mnt/secure_fs -o allow_other
+```
+
+
+
+### [Task 2 - LawakFS++]
 #### lawak.c
 ```c
 #define FUSE_USE_VERSION 28
@@ -210,20 +397,15 @@ void DETECT_LAWAK(char *buf, int size) {
         char abclower[256];  
         strtolower(abclower, token); 
         
-        int cek = 0;
-    for (int i = 0; i < countsensitif; i++) {
-        if (strcmp(abclower, lawakwords[i]) == 0) {
-            strcat(lawakspace, "lawak");
-            cek = 1;
-            break;
+        for (int i = 0; i < countsensitif; i++) {
+            if (strcmp(abclower, lawakwords[i]) == 0) {
+                strcat(lawakspace, "lawak");
+                // cek = 1;
+                break;
+            }
         }
-    }
-    if (!cek) {
-        strcat(lawakspace, token);
-    }
-    strcat(lawakspace, " ");
-    token = strtok_r(NULL, " \n\r\t", &saveptr);
-
+        strcat(lawakspace, " ");
+        token = strtok_r(NULL, " \n\r\t", &saveptr);
     }
     
     // int len = strlen(lawakspace);
@@ -411,14 +593,14 @@ int main(int argc, char *argv[]){
 }
 
 ```
-### Penjelasan lawak.c
-#### Penjelasan ke-0
+#### Penjelasan lawak.c
+##### Penjelasan ke-0
 1. Tambahkan open dan access dari template yang diberikan di modul. [Klik disini untuk melihat modul](https://github.com/arsitektur-jaringan-komputer/Modul-Sisop/blob/master/Modul4/README-ID.md)
 2. Fungsi Main, menerima beberapa argumen dan masuk ke sub-fungsi load_config untuk menyalin isi dari lawak.conf kedalam beberapa nama file yang sudah saya buat. Yakni katasensitif, countsensitif, start_hour, end_hour.
 3. Kita bikin char *dirpath yang berisikan path menuju ke direktori source yang kita bikin.
 4. Masuk ke fungsi fuse, ada getattr, opendir, readdir, read, open, dan juga access.
 
-#### *A. Menyembunyikan ekstensi dari setiap file.*
+##### *A. Menyembunyikan ekstensi dari setiap file.*
 Pendahuluan Problem A : Karena kita perlu menyembunyikan ektensi dari setiap file ketika kita melakukan command "ls", maka hal yang perlu diperhatikan dan dimodifikasi adalah utamanya terkait readdir. Namun ketika kita ingin melakukan perintah seperti "cat", kita hanya boleh menuliskan nama filenya tanpa ekstensinya juga (contoh : "cat temulawak", maka nanti akan dimunculkan hasil tulisan dari temulawak.txt). Hal ini memicu saya untuk membuat suatu sub-fungsi baru yakni misteriusNama, yang berfungsi sebagai petunjuk ke path asli dari suatu file.
 
 *Penjelasan misteriusNama :*
@@ -436,16 +618,7 @@ Pendahuluan Problem A : Karena kita perlu menyembunyikan ektensi dari setiap fil
 - Lalu kita buat variabel "nama", yang mana menampung nama file dari source tanpa ekstensi.
 - Gunakan filler untuk menampilkan nama file tanpa ekstensi pada saat user menulis command "ls"
 
-*Beberapa bukti SS dan/atau hasil Output dari kasus A :*
-##### Isi direktori SOURCE
-![image](https://github.com/user-attachments/assets/550efbf2-0f98-4a56-a324-6d47a117bfd8)
-##### Nama nama file dalam MOUNT
-![image](https://github.com/user-attachments/assets/51376bbd-7e6f-4b17-8ff1-f4228f1240ba)
-##### Kalau misal cat tes, maka akan diakses tes.txt di dirpath (SOURCE)
-![image](https://github.com/user-attachments/assets/9f584f21-c891-4f5f-bb34-eb3fe00f425a)
-![image](https://github.com/user-attachments/assets/124ef2d6-0495-4149-9568-3481d21ae2ea)
-
-#### *B. Akses terbatas untuk file dengan nama secret*
+##### *B. Akses terbatas untuk file dengan nama secret*
 Pendahuluan Problem B : Pertama, kita perlu menentukan algoritma untuk mendeteksi apakah sebuah file bernama secret (atau sesuai nama yang ditentukan di konfigurasi) terdapat dalam path yang diakses. Untuk itu, saya menggunakan solusi berupa pembuatan sub-fungsi secretFile, yang bertugas mengecek apakah nama file sesuai dengan nama dasar yang dikonfigurasi. Selanjutnya, karena akses ke file tersebut harus dibatasi pada jam-jam tertentu, saya juga membuat sub-fungsi jamSecret yang akan menentukan apakah waktu saat ini berada dalam rentang waktu yang diizinkan untuk mengakses file tersebut.
 
 *Penjelasan secretFile :*
@@ -458,10 +631,6 @@ Pendahuluan Problem B : Pertama, kita perlu menentukan algoritma untuk mendeteks
 - track hour, dan set dibatasi dari jam 08.00 hingga 18.00
 
 Lalu yang perlu kita lakukan yakni meng-Update getattr, readdir, open, access, dan read.
-
-*Beberapa bukti SS dan/atau hasil Output dari kasus B :*
-##### File bernama secret hilang pada jam 21.07.22
-![image](https://github.com/user-attachments/assets/b924ccb3-be57-4fd3-b9f0-866ef1ed4811)
 
 ##### *C. Filter konten*
 Pendahuluan Problem C : Kita perlu memfilter 2 tipe konten. Ada konten file tipe .txt yang nantinya akan difilter kata-katanya berdasarkan daftar kata terlarang dari konfigurasi. Setiap kata yang cocok akan diganti menjadi kata 'lawak'. Proses ini dilakukan dengan membaca seluruh isi file, memecahnya menjadi token, lalu mencocokkannya dengan daftar filter. Sementara itu, untuk konten file tipe gambar (atau biner pada umumnya), isi file tidak ditampilkan dalam bentuk mentah. Sebagai gantinya, file dikonversi ke dalam format Base64 agar tetap dapat ditampilkan secara aman dan tidak merusak tampilan terminal. Konversi ini dilakukan menggunakan fungsi base64_encode() yang mengubah blok data biner menjadi representasi teks ASCII. dan karena dalam kedua proses ini kita "membaca" berarti nantinya kita akan banyak mengubah sub fungsi read
@@ -487,16 +656,6 @@ Pendahuluan Problem C : Kita perlu memfilter 2 tipe konten. Ada konten file tipe
 - Jika jumlah input tidak kelipatan 3, maka karakter padding '=' akan ditambahkan di akhir untuk menjaga panjang output tetap kelipatan 4
 - Hasil akhir dari konversi ini disalin ke variabel output (out), lalu dikembalikan panjangnya
 
-*Beberapa bukti SS dan/atau hasil Output dari kasus C :*
-##### Isi lawak.conf yang dibuat pada poin E
-![image](https://github.com/user-attachments/assets/1530923c-5da3-4179-817e-58da48dfa4aa)
-##### Isi dari teslawak.txt pada direktori SOURCE
-![image](https://github.com/user-attachments/assets/ebd9e14e-e847-4c0d-bef1-c4a635d27aac)
-##### cat teslawak di MOUNT
-![image](https://github.com/user-attachments/assets/393ad449-6db9-4997-abdc-cd777c6d0f98)
-##### cat pemandangan di MOUNT (pembuktian Base64)
-![image](https://github.com/user-attachments/assets/825e2388-d93a-4806-8d4f-4ace97856236)
-
 ##### *D. Logging Akses*
 Pendahuluan Problem D : Kita perlu mencatat log di logfile pada saat aksi READ dan ACCESS. Pada laporan log juga harus disediakan kapan READ/ACCESS itu dilakukan.
 format LOG = [YYYY-MM-DD HH:MM:SS] [UID] [ACTION] [PATH]
@@ -511,22 +670,13 @@ format LOG = [YYYY-MM-DD HH:MM:SS] [UID] [ACTION] [PATH]
 
 Update READ dan ACCESS untuk mengeluarkan output log dan arahkan ke write_log 
 
-*Beberapa bukti SS dan/atau hasil Output dari kasus D :*
-##### Contoh dari log
-![image](https://github.com/user-attachments/assets/61402d6e-9cc4-4726-b697-688fcfbb9ced)
-
 ##### *E. Bikin configurasi*
 Pendahuluan Problem E : Kita perlu menuliskan apa apa saja kata yang sensitif atau terdetect "lawak", lalu nama file apa yang ingin diistimewakan dalam artian hanya bisa diakses pada jam jam tertentu, dan aksesnya dari jam berapa ke jam berapa. Configurasi ini membuat kita menjadi lebih fleksibel, dimana kita bisa mengubah informasi sesuka hati (misal : Saya ingin mengubah jam awal akses pada nama file pemandangan)
 
 *Penjelasan load_config :*
-- Pertama kita set dulu bahwa semua variabel penampung adalah kosong melompong, seperti katasensitif[0] = '\0', start_hour = -1, end_hour = -1, countsensitif = 0
-- Kita buat temp untuk menampung informasi dari baris baris lawak.conf
-- Lalu di track bila yang ditemukan dalam lawak.conf adalah "SECRET_FILE_BASENAME=", maka start dari temp + 21 karakter untuk menyimpan kedalam variabel "katasensitif"
-- Bila yang ditemukan dalam lawak.conf adalah "ACCESS_START=", maka start dari temp + 13 karakter untuk menyimpan kedalam variabel "start_hour"
-- Bila yang ditemukan dalam lawak.conf adalah "ACCESS_END=", maka start dari temp + 11 karakter untuk menyimpan kedalam variabel "end_hour"
-- Bila yang ditemukan dalam lawak.conf adalah "FILTER_WORDS=", maka start dari temp + 13 karakter untuk menyimpan kedalam variabel "words"
-- Nantinya words akan dipecah-pecah kata perkatanya dan disimpan dalam variabel lawakwords yang nantinya akan dipakai pada subfungsi-subfungsi lain apakah terdapat kata dalam suatu file yang mengandung kata "lawak"
 
+
+#### Beberapa bukti SS dan/atau hasil Output
 #### Kendala
 
 #### lawak.conf
