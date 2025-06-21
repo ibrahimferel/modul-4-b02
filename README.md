@@ -23,7 +23,9 @@
 
 ### [Task 1 - FUSecure]
 
-### [Task 2 - LawakFS++]
+### [Task 2 - LawakFS++] (Hard)
+Author : Ibrahim Ferel - 5025241049
+
 #### lawak.c
 ```c
 #define FUSE_USE_VERSION 28
@@ -485,8 +487,14 @@ Update READ dan ACCESS untuk mengeluarkan output log dan arahkan ke write_log
 Pendahuluan Problem E : Kita perlu menuliskan apa apa saja kata yang sensitif atau terdetect "lawak", lalu nama file apa yang ingin diistimewakan dalam artian hanya bisa diakses pada jam jam tertentu, dan aksesnya dari jam berapa ke jam berapa. Configurasi ini membuat kita menjadi lebih fleksibel, dimana kita bisa mengubah informasi sesuka hati (misal : Saya ingin mengubah jam awal akses pada nama file pemandangan)
 
 *Penjelasan load_config :*
-
-
+- Pertama kita set dulu bahwa semua variabel penampung adalah kosong melompong, seperti katasensitif[0] = '\0', start_hour = -1, end_hour = -1, countsensitif = 0
+- Kita buat temp untuk menampung informasi dari baris baris lawak.conf
+- Lalu di track bila yang ditemukan dalam lawak.conf adalah "SECRET_FILE_BASENAME=", maka start dari temp + 21 karakter untuk menyimpan kedalam variabel "katasensitif"
+- Bila yang ditemukan dalam lawak.conf adalah "ACCESS_START=", maka start dari temp + 13 karakter untuk menyimpan kedalam variabel "start_hour"
+- Bila yang ditemukan dalam lawak.conf adalah "ACCESS_END=", maka start dari temp + 11 karakter untuk menyimpan kedalam variabel "end_hour"
+- Bila yang ditemukan dalam lawak.conf adalah "FILTER_WORDS=", maka start dari temp + 13 karakter untuk menyimpan kedalam variabel "words"
+- Nantinya words akan dipecah-pecah kata perkatanya dan disimpan dalam variabel lawakwords yang nantinya akan dipakai pada subfungsi-subfungsi lain apakah terdapat kata dalam suatu file yang mengandung kata "lawak"
+- 
 #### Beberapa bukti SS dan/atau hasil Output
 #### Kendala
 
