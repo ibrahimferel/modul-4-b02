@@ -405,10 +405,11 @@ int main(int argc, char *argv[]){
 
 ```
 #### Penjelasan lawak.c
-##### Pendahuluan
-1. Fungsi Main, menerima beberapa argumen dan masuk ke sub-fungsi load_config untuk menyalin isi dari lawak.conf kedalam beberapa nama file yang sudah saya buat. Yakni katasensitif, countsensitif, start_hour, end_hour.
-2. Kita bikin char *dirpath yang berisikan path menuju ke direktori source yang kita bikin.
-3. Masuk ke fungsi fuse, ada getattr, opendir, readdir, read, open, dan juga access.
+##### Penjelasan ke-0
+1. Tambahkan open dan access dari template yang diberikan di modul. [Klik disini untuk melihat modul](https://github.com/arsitektur-jaringan-komputer/Modul-Sisop/blob/master/Modul4/README-ID.md)
+2. Fungsi Main, menerima beberapa argumen dan masuk ke sub-fungsi load_config untuk menyalin isi dari lawak.conf kedalam beberapa nama file yang sudah saya buat. Yakni katasensitif, countsensitif, start_hour, end_hour.
+3. Kita bikin char *dirpath yang berisikan path menuju ke direktori source yang kita bikin.
+4. Masuk ke fungsi fuse, ada getattr, opendir, readdir, read, open, dan juga access.
 
 ##### *A. Menyembunyikan ekstensi dari setiap file.*
 Pendahuluan Problem A : Karena kita perlu menyembunyikan ektensi dari setiap file ketika kita melakukan command "ls", maka hal yang perlu diperhatikan dan dimodifikasi adalah utamanya terkait readdir. Namun ketika kita ingin melakukan perintah seperti "cat", kita hanya boleh menuliskan nama filenya tanpa ekstensinya juga (contoh : "cat temulawak", maka nanti akan dimunculkan hasil tulisan dari temulawak.txt). Hal ini memicu saya untuk membuat suatu sub-fungsi baru yakni misteriusNama, yang berfungsi sebagai petunjuk ke path asli dari suatu file.
@@ -429,7 +430,7 @@ Pendahuluan Problem A : Karena kita perlu menyembunyikan ektensi dari setiap fil
 - Gunakan filler untuk menampilkan nama file tanpa ekstensi pada saat user menulis command "ls"
 
 ##### *B. Akses terbatas untuk file dengan nama secret*
-Pendahuluan Problem B : Pertama kita harus menentukan algoritma untuk mencari nama file yang bernama secret di dalam pathnya menggunakan solusi yang saya tawarkan yakni membuat sub-fungsi secretFile. Dan disini karena harus membatasi akses pada jam-jam tertentu, kita akan bikin sub-fungsi jamSecret untuk menentukan jam aksesnya.
+Pendahuluan Problem B : Pertama, kita perlu menentukan algoritma untuk mendeteksi apakah sebuah file bernama secret (atau sesuai nama yang ditentukan di konfigurasi) terdapat dalam path yang diakses. Untuk itu, saya menggunakan solusi berupa pembuatan sub-fungsi secretFile, yang bertugas mengecek apakah nama file sesuai dengan nama dasar yang dikonfigurasi. Selanjutnya, karena akses ke file tersebut harus dibatasi pada jam-jam tertentu, saya juga membuat sub-fungsi jamSecret yang akan menentukan apakah waktu saat ini berada dalam rentang waktu yang diizinkan untuk mengakses file tersebut.
 
 *Penjelasan secretFile :*
 - Pertama kita buat variabel "filename" untuk menampung nama file setelah dipisah dengan jalur pathnya
@@ -442,47 +443,25 @@ Pendahuluan Problem B : Pertama kita harus menentukan algoritma untuk mencari na
 
 Lalu yang perlu kita lakukan yakni meng-Update getattr, readdir, open, access, dan read.
 
-##### *B. Akses terbatas untuk file dengan nama secret*
-Pendahuluan Problem B : Pertama kita harus menentukan algoritma untuk mencari nama file yang bernama secret di dalam pathnya menggunakan solusi yang saya tawarkan yakni membuat sub-fungsi secretFile. Dan disini karena harus membatasi akses pada jam-jam tertentu, kita akan bikin sub-fungsi jamSecret untuk menentukan jam aksesnya.
+##### *C. Filter konten*
+Pendahuluan Problem C : Kita perlu memfilter 2 tipe konten. Ada konten file tipe .txt yang nantinya akan difilter kata-katanya berdasarkan daftar kata terlarang dari konfigurasi. Setiap kata yang cocok akan diganti menjadi kata 'lawak'. Proses ini dilakukan dengan membaca seluruh isi file, memecahnya menjadi token, lalu mencocokkannya dengan daftar filter. Sementara itu, untuk konten file tipe gambar (atau biner pada umumnya), isi file tidak ditampilkan dalam bentuk mentah. Sebagai gantinya, file dikonversi ke dalam format Base64 agar tetap dapat ditampilkan secara aman dan tidak merusak tampilan terminal. Konversi ini dilakukan menggunakan fungsi base64_encode() yang mengubah blok data biner menjadi representasi teks ASCII. dan karena dalam kedua proses ini kita "membaca" berarti nantinya kita akan banyak mengubah sub fungsi read
 
-*Penjelasan secretFile :*
-- Pertama kita buat variabel "filename" untuk menampung nama file setelah dipisah dengan jalur pathnya
-- Lalu kita buat variabel "nama" untuk menampung nama filenya tanpa ekstensi
-- Lalu bandingkan apakah "nama" ini sama dengan kata "secret" dan return hasilnya
-  
-*Penjelasan jamSecret :*
-- Dapetin waktu sekarang (local_time)
-- track hour, dan set dibatasi dari jam 08.00 hingga 18.00
+*Penjelasan read :*
+- Pertama detect dulu ekstensi file yang sedang dibaca itu apa, kalau ternyata file.txt, maka process akan masuk kedalam sub fungsi DETECT_LAWAK untuk mengganti kata kata yang dianggap lawak menjadi kata "lawak"
+- Panjang hasil dari DETECT_LAWAK nantinya diukur kembali panjang nya berapa menggunakan strlen
+- Namun apabila file tersebut adalah file biner, kita akan buat 2 variabel yang bernama masing-masing "B64" dan "tmpB64". Variabel B64 digunakan untuk ngambil hasil output aslinya ketika kita melakukan "cat" pada file biner, dan tmpB64 akan menampung hasil dari process dimodifikasi nya hasil output asli tersebut menjadi output dalam bentuk Base64
+- Hasil disalin ke buf dan ditampilkan.
 
-Lalu yang perlu kita lakukan yakni meng-Update getattr, readdir, open, access, dan read.
+*Penjelasan DETECT_LAWAK :*
+- Bikin variabel untuk menampung hasil akhirnya, disini kita memakai variabel dengan nama "lawakspace"
+- Lalu kita salin isi buf ke variabel copy, karena nantinya bakal banyak modifikasi-modifikasi yang dilakukan oleh strtok
+- Lalu isi dari file nya, kata per katanya kita pecah-pecah menggunakan strtok, dan dimodifikasi menjadi huruf kecil semua(apabila ada alphabet besar)
+- Kemudian hasil dari poin 3, akan dibandingkan apakah sama dengan kata yang bersifat sensitif, jika iya maka kita perlu menuliskan kata "lawak" kedalam lawakspace, jika tidak tuliskan seperti biasa
+- Hasil dari lawakspace pindahkan ke buf lagi
+- Bebaskan memory copy dan lawakspace
 
-##### *B. Akses terbatas untuk file dengan nama secret*
-Pendahuluan Problem B : Pertama kita harus menentukan algoritma untuk mencari nama file yang bernama secret di dalam pathnya menggunakan solusi yang saya tawarkan yakni membuat sub-fungsi secretFile. Dan disini karena harus membatasi akses pada jam-jam tertentu, kita akan bikin sub-fungsi jamSecret untuk menentukan jam aksesnya.
-
-*Penjelasan secretFile :*
-- Pertama kita buat variabel "filename" untuk menampung nama file setelah dipisah dengan jalur pathnya
-- Lalu kita buat variabel "nama" untuk menampung nama filenya tanpa ekstensi
-- Lalu bandingkan apakah "nama" ini sama dengan kata "secret" dan return hasilnya
-  
-*Penjelasan jamSecret :*
-- Dapetin waktu sekarang (local_time)
-- track hour, dan set dibatasi dari jam 08.00 hingga 18.00
-
-Lalu yang perlu kita lakukan yakni meng-Update getattr, readdir, open, access, dan read.
-
-##### *B. Akses terbatas untuk file dengan nama secret*
-Pendahuluan Problem B : Pertama kita harus menentukan algoritma untuk mencari nama file yang bernama secret di dalam pathnya menggunakan solusi yang saya tawarkan yakni membuat sub-fungsi secretFile. Dan disini karena harus membatasi akses pada jam-jam tertentu, kita akan bikin sub-fungsi jamSecret untuk menentukan jam aksesnya.
-
-*Penjelasan secretFile :*
-- Pertama kita buat variabel "filename" untuk menampung nama file setelah dipisah dengan jalur pathnya
-- Lalu kita buat variabel "nama" untuk menampung nama filenya tanpa ekstensi
-- Lalu bandingkan apakah "nama" ini sama dengan kata "secret" dan return hasilnya
-  
-*Penjelasan jamSecret :*
-- Dapetin waktu sekarang (local_time)
-- track hour, dan set dibatasi dari jam 08.00 hingga 18.00
-
-Lalu yang perlu kita lakukan yakni meng-Update getattr, readdir, open, access, dan read.
+*Penjelasan base64_encode :*
+-
 
 
 #### Beberapa bukti SS dan/atau hasil Output
